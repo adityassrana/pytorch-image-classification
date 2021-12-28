@@ -12,8 +12,8 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import datasets, transforms
 
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
 
 def conv(ni, nf, ks=3, stride=1, padding=1, **kwargs):
     """
@@ -141,28 +141,26 @@ def parse_args(args=sys.argv[1:]):
     args = parser.parse_args(args)
     return args
 
-
 if __name__ == '__main__':
 
     # parse command line arguments
     args = parse_args()
 
-    print(args)
+    logger.info(args)
 
     # check for CUDA availabilitu
     if torch.cuda.is_available():
-        print('CUDA is available, setting device to CUDA')
+        logger.info('CUDA is available, setting device to CUDA')
     # set device to  CUDA for training
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # get dataloaders
+    logger.info("Getting Dataloaders")
     train_loader, test_loader = get_dataloaders(
         Path(args.data_path), args.image_size, args.batch_size, args.num_workers)
-    print('Dataloaders ready')
 
     # get training model and plot summary
     model = get_model()
-    #summary(model, (3, args.image_size, args.image_size), device='cpu')
     # send model to GPU
     model.to(device)
 
@@ -224,7 +222,7 @@ if __name__ == '__main__':
             writer_train.add_scalar('per_epoch/accuracy', train_acc_epoch, epoch)
 
         model.eval()
-        with torch.no_grad():
+        with torch.inference_mode():
             losses, acc, count = [], [], []
             for batch_idx, (xb, yb) in enumerate((test_loader)):
                 # transfer data to GPU
@@ -254,17 +252,17 @@ if __name__ == '__main__':
             writer_test.add_scalar('per_epoch/losses', test_loss_epoch, epoch)
             writer_test.add_scalar('per_epoch/accuracy', test_acc_epoch, epoch)
 
-        print(f"Epoch{epoch}, train_accuracy:{train_acc_epoch:.4f}, test_accuracy:{test_acc_epoch:.4f}, train_loss:{train_loss_epoch:.4f}, test_loss:{test_loss_epoch:.4f}")
+        logger.info(f"Epoch{epoch}, train_accuracy:{train_acc_epoch:.4f}, test_accuracy:{test_acc_epoch:.4f}, train_loss:{train_loss_epoch:.4f}, test_loss:{test_loss_epoch:.4f}")
 
         if args.save_model:
+            logger.info("Saving Model")
             torch.save(model.state_dict(), f"{args.exp_name}_epoch{epoch}_acc{train_acc_epoch:.4f}")
-            print("Model saved")
 
-    print("Finished training")
+    logger.info("Finished training")
 
     if args.plot_stats:
         plot_hist(train_acc_hist, test_acc_hist, 'accuracy',
                   xmax=args.max_epochs, location='lower right')
         plot_hist(train_loss_hist, test_loss_hist, 'loss',
                   xmax=args.max_epochs, location='upper right')
-        print("Finished plotting")
+        logger.info("Finished plotting")
